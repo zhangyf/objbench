@@ -4,18 +4,17 @@ package config
 import (
 	"errors"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"time"
 
-	yaml "gopkg.in/yaml.v2"
+	"github.com/zhangyf/objstore"
 )
 
 // Config holds all benchmark parameters.
 type Config struct {
-	// BucketYAML is the raw objstore client.NewBucket YAML config bytes.
-	BucketYAML []byte
+	// Store is the objstore connection configuration (provider/bucket/creds).
+	Store objstore.Config
 
 	// Sizes is the list of object sizes (in bytes) to benchmark.
 	Sizes []int64
@@ -96,24 +95,15 @@ func ParseSizes(list string) ([]int64, error) {
 	return out, nil
 }
 
-// LoadBucketYAML reads the objstore bucket configuration file.
-func LoadBucketYAML(path string) ([]byte, error) {
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("read bucket config %q: %w", path, err)
-	}
-	// Validate it is parseable YAML before handing off.
-	var probe map[string]interface{}
-	if err := yaml.Unmarshal(b, &probe); err != nil {
-		return nil, fmt.Errorf("bucket config %q is not valid YAML: %w", path, err)
-	}
-	return b, nil
-}
-
 // Validate checks the configuration for consistency.
 func (c *Config) Validate() error {
-	if len(c.BucketYAML) == 0 {
-		return errors.New("bucket config is required (-config)")
+	switch c.Store.Provider {
+	case objstore.ProviderCOS, objstore.ProviderS3:
+	default:
+		return fmt.Errorf("provider must be %q or %q", objstore.ProviderCOS, objstore.ProviderS3)
+	}
+	if c.Store.Bucket == "" {
+		return errors.New("bucket is required (-bucket)")
 	}
 	if len(c.Sizes) == 0 {
 		return errors.New("at least one size is required (-sizes)")

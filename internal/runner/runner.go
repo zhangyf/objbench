@@ -1,4 +1,4 @@
-// Package runner executes the benchmark workload against an objstore.Bucket.
+// Package runner executes the benchmark workload against an objstore.Store.
 package runner
 
 import (
@@ -10,22 +10,22 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/thanos-io/objstore"
+	"github.com/zhangyf/objstore"
 
 	"github.com/zhangyf/objbench/internal/config"
 	"github.com/zhangyf/objbench/internal/stats"
 	"github.com/zhangyf/objbench/internal/workload"
 )
 
-// Runner drives the benchmark for a single bucket.
+// Runner drives the benchmark for a single store.
 type Runner struct {
-	bkt objstore.Bucket
-	cfg *config.Config
+	store objstore.Store
+	cfg   *config.Config
 }
 
 // New constructs a Runner.
-func New(bkt objstore.Bucket, cfg *config.Config) *Runner {
-	return &Runner{bkt: bkt, cfg: cfg}
+func New(store objstore.Store, cfg *config.Config) *Runner {
+	return &Runner{store: store, cfg: cfg}
 }
 
 // RunSize executes one duration-bounded workload for a given object size and
@@ -63,7 +63,7 @@ func (r *Runner) RunSize(ctx context.Context, size int64) (stats.Summary, []stri
 	if r.cfg.ReadRatio > 0 {
 		for i := 0; i < warm; i++ {
 			key := r.keyFor(size, "warm", i)
-			if err := r.bkt.Upload(ctx, key, payload.Reader()); err != nil {
+			if err := r.store.PutObjectStream(ctx, key, payload.Reader(), size); err != nil {
 				return stats.Summary{}, keys, fmt.Errorf("warmup upload: %w", err)
 			}
 			addKey(key)
@@ -117,7 +117,7 @@ func (r *Runner) RunSize(ctx context.Context, size int64) (stats.Summary, []stri
 
 func (r *Runner) doUpload(ctx context.Context, c *stats.Collector, key string, body io.Reader, size int64) bool {
 	t0 := time.Now()
-	err := r.bkt.Upload(ctx, key, body)
+	err := r.store.PutObjectStream(ctx, key, body, size)
 	lat := time.Since(t0)
 	if ctx.Err() != nil && err != nil {
 		// Timeout cancellation; don't record a misleading sample.
@@ -134,7 +134,7 @@ func (r *Runner) doUpload(ctx context.Context, c *stats.Collector, key string, b
 
 func (r *Runner) doDownload(ctx context.Context, c *stats.Collector, key string) {
 	t0 := time.Now()
-	rc, err := r.bkt.Get(ctx, key)
+	rc, err := r.store.GetObject(ctx, key)
 	var n int64
 	if err == nil {
 		n, _ = io.Copy(io.Discard, rc)
@@ -156,9 +156,9 @@ func (r *Runner) keyFor(size int64, tag string, i int) string {
 	return fmt.Sprintf("%sobjbench/sz-%d/%s-%d", r.cfg.KeyPrefix, size, tag, i)
 }
 
-// Cleanup deletes the given keys, ignoring not-found errors.
+// Cleanup deletes the given keys, ignoring errors.
 func (r *Runner) Cleanup(ctx context.Context, keys []string) {
 	for _, k := range keys {
-		_ = r.bkt.Delete(ctx, k)
+		_ = r.store.DeleteObject(ctx, k)
 	}
 }

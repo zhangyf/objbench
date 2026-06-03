@@ -1,20 +1,22 @@
 # objbench
 
-`objbench` 是一个对象存储性能压测工具，基于 [thanos-io/objstore](https://github.com/thanos-io/objstore) 接口库实现。
-一套代码即可对接 S3、腾讯云 COS、GCS、Azure Blob、阿里云 OSS、华为 OBS、百度 BOS、Swift、本地文件系统等多种后端。
+`objbench` 是一个对象存储性能压测工具，基于 [`github.com/zhangyf/objstore`](https://github.com/zhangyf/objstore) 接口库实现。
+通过统一的 `objstore.Store` 接口对接 **腾讯云 COS** 与 **AWS S3（及 S3 兼容存储）**，一套代码两种后端。
 
 ## 特性
 
-- **多后端统一接口**：通过 `objstore` 的 `Bucket` 接口操作，配置驱动，无需为每个云改代码。
-- **多档文件大小**：一次运行可对多个对象大小分别压测（如 `4k,64k,1m,16m`）。
+- **统一接口**：基于 `objstore.Store`，COS / S3 用同一套压测逻辑。
+- **多档文件大小**：一次运行对多个对象大小分别压测（如 `4k,64k,1m,16m`）。
 - **固定测试时长**：每个大小分组运行指定时长（`-duration`）。
 - **读写混合比例**：通过 `-read-ratio` 指定读操作占比，其余为写。
-- **完整指标**：测试结束后输出 QPS、吞吐量、Min/Mean/P50/P90/P95/P99/Max 时延，上传/下载/汇总分别统计。
+- **完整指标**：测试结束输出 QPS、吞吐量、Min/Mean/P50/P90/P95/P99/Max 时延，上传/下载/汇总分开统计。
 - **自动预热与清理**：读测试前自动预上传对象作为目标；结束后可自动清理。
 
 ## 安装
 
 ```bash
+# 私有依赖，需先配置 GOPRIVATE 与 git 凭据
+go env -w GOPRIVATE=github.com/zhangyf
 go install github.com/zhangyf/objbench/cmd/objbench@latest
 ```
 
@@ -28,58 +30,50 @@ go build -o objbench ./cmd/objbench
 
 ## 使用
 
-### 1. 准备 bucket 配置（objstore YAML 格式）
-
-S3 示例 `s3.yaml`：
-
-```yaml
-type: S3
-config:
-  bucket: my-bucket
-  endpoint: s3.ap-northeast-1.amazonaws.com
-  region: ap-northeast-1
-  access_key: <AK>
-  secret_key: <SK>
-```
-
-腾讯云 COS 示例 `cos.yaml`：
-
-```yaml
-type: COS
-config:
-  bucket: my-bucket-1250000000
-  region: ap-beijing
-  app_id: "1250000000"
-  secret_id: <SecretId>
-  secret_key: <SecretKey>
-```
-
-本地文件系统（用于本机验证）`fs.yaml`：
-
-```yaml
-type: FILESYSTEM
-config:
-  directory: /tmp/objbench-data
-```
-
-> 配置字段与各 provider 的官方定义一致，详见 objstore 文档。
-
-### 2. 运行压测
+### 腾讯云 COS
 
 ```bash
 objbench \
-  -config s3.yaml \
+  -provider cos \
+  -bucket my-bucket-1250000000 \
+  -region ap-beijing \
+  -secret-id  $COS_SECRET_ID \
+  -secret-key $COS_SECRET_KEY \
   -sizes 4k,64k,1m,8m \
   -duration 30s \
   -concurrency 32 \
   -read-ratio 0.7
 ```
 
+### AWS S3
+
+```bash
+objbench \
+  -provider s3 \
+  -bucket test-bkt-tk \
+  -region ap-northeast-1 \
+  -secret-id  $AWS_ACCESS_KEY_ID \
+  -secret-key $AWS_SECRET_ACCESS_KEY \
+  -sizes 1m,8m,64m \
+  -duration 1m \
+  -concurrency 64 \
+  -read-ratio 0.5
+```
+
+> S3 凭证为空时自动走 AWS default credential chain（env / 共享凭据文件 / IMDS / STS）。
+> 可用 `-profile` 指定 AWS profile，`-endpoint` 指定 S3 兼容存储的自定义 endpoint。
+
 ## 参数
 
 | 参数            | 默认值          | 说明                                       |
 |-----------------|-----------------|--------------------------------------------|
-| `-config`       | （必填）        | objstore bucket YAML 配置文件路径          |
+| `-provider`     | `cos`           | 存储后端：`cos` 或 `s3`                    |
+| `-bucket`       | （必填）        | 桶名                                       |
+| `-region`       | `""`            | 区域，如 `ap-beijing` / `ap-northeast-1`   |
+| `-secret-id`    | `""`            | COS SecretId / S3 Access Key ID            |
+| `-secret-key`   | `""`            | COS SecretKey / S3 Secret Access Key       |
+| `-endpoint`     | `""`            | 自定义 endpoint（S3 兼容模式）             |
+| `-profile`      | `""`            | AWS profile（仅 S3，密钥为空时生效）       |
 | `-sizes`        | `4k,64k,1m,8m`  | 逗号分隔的对象大小列表，支持 `k/m/g` 单位   |
 | `-duration`     | `30s`           | 每个大小分组的测试时长                     |
 | `-concurrency`  | `16`            | 并发 worker 数                             |
@@ -87,7 +81,6 @@ objbench \
 | `-prefix`       | `""`            | 所有压测对象的 key 前缀                    |
 | `-cleanup`      | `true`          | 测试结束后删除创建的对象                   |
 | `-warmup`       | `0`             | 每个大小预上传的对象数（0 = 并发数）       |
-| `-verbose`      | `false`         | 打开 objstore 客户端日志                   |
 
 ## 输出示例
 
@@ -106,6 +99,12 @@ overall   21608   0    720.1    720.0 MiB/s   0.72ms    14.5ms   ...
 - **throughput**：单位时间传输的字节数（上传按对象大小计，下载按实际读取字节计）。
 - **P90/P95/P99**：采用 nearest-rank 方法从全部时延样本中计算的分位时延。
 - **upload / download / overall**：分别为写、读、合并的统计。
+
+## 实现说明
+
+- 上传走 `Store.PutObjectStream(ctx, key, r, size)`，下载走 `Store.GetObject` 并完整读取计入吞吐。
+- 每个 worker 独立随机决定读/写；读操作从已上传的 key 中随机选取目标。
+- 时延全量采样后排序计算分位，避免估算误差。
 
 ## License
 
