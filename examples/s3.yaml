@@ -1,0 +1,7 @@
+type: S3
+config:
+  bucket: my-bucket
+  endpoint: s3.ap-northeast-1.amazonaws.com
+  region: ap-northeast-1
+  access_key: REPLACE_ME
+  secret_key: REPLACE_ME

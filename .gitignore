@@ -1,0 +1,15 @@
+# Binaries
+/objbench
+objbench
+*.exe
+
+# Test data
+/tmp/objbench-data/
+
+# Local bucket configs (may contain secrets)
+*.local.yaml
+secrets.yaml
+
+# Go
+*.test
+*.out
