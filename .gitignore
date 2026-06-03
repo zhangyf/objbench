@@ -1,15 +1,12 @@
-# Binaries
+# Binaries (compiled output only, not the cmd/objbench source dir)
 /objbench
-objbench
-*.exe
+/objbench.exe
+*.test
 
 # Test data
 /tmp/objbench-data/
 
-# Local bucket configs (may contain secrets)
+# Local configs that may contain secrets
 *.local.yaml
 secrets.yaml
-
-# Go
-*.test
 *.out
