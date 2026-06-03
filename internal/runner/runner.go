@@ -10,6 +10,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"golang.org/x/time/rate"
+
 	"github.com/zhangyf/objstore"
 
 	"github.com/zhangyf/objbench/internal/config"
@@ -31,9 +33,23 @@ func New(store objstore.Store, cfg *config.Config) *Runner {
 // RunSize executes one duration-bounded workload for a given object size and
 // returns the computed summary plus the list of keys created (for cleanup).
 func (r *Runner) RunSize(ctx context.Context, size int64) (stats.Summary, []string, error) {
+	samples, keys, wall, err := r.runSizeRaw(ctx, size)
+	if err != nil {
+		return stats.Summary{}, keys, err
+	}
+	return stats.Compute(samples, wall), keys, nil
+}
+
+// RunSizeRaw is like RunSize but returns the raw samples and wall window so a
+// distributed agent can build a mergeable AgentReport.
+func (r *Runner) RunSizeRaw(ctx context.Context, size int64) ([]stats.Sample, []string, time.Duration, error) {
+	return r.runSizeRaw(ctx, size)
+}
+
+func (r *Runner) runSizeRaw(ctx context.Context, size int64) ([]stats.Sample, []string, time.Duration, error) {
 	payload, err := workload.NewPayload(size)
 	if err != nil {
-		return stats.Summary{}, nil, fmt.Errorf("alloc payload: %w", err)
+		return nil, nil, 0, fmt.Errorf("alloc payload: %w", err)
 	}
 
 	collector := stats.NewCollector()
@@ -64,7 +80,7 @@ func (r *Runner) RunSize(ctx context.Context, size int64) (stats.Summary, []stri
 		for i := 0; i < warm; i++ {
 			key := r.keyFor(size, "warm", i)
 			if err := r.store.PutObjectStream(ctx, key, payload.Reader(), size); err != nil {
-				return stats.Summary{}, keys, fmt.Errorf("warmup upload: %w", err)
+				return nil, keys, 0, fmt.Errorf("warmup upload: %w", err)
 			}
 			addKey(key)
 		}
@@ -72,6 +88,16 @@ func (r *Runner) RunSize(ctx context.Context, size int64) (stats.Summary, []stri
 
 	runCtx, cancel := context.WithTimeout(ctx, r.cfg.Duration)
 	defer cancel()
+
+	// Optional token-bucket limiter. nil means unlimited (saturation).
+	var limiter *rate.Limiter
+	if r.cfg.Rate > 0 {
+		burst := r.cfg.Burst
+		if burst <= 0 {
+			burst = 1
+		}
+		limiter = rate.NewLimiter(rate.Limit(r.cfg.Rate), burst)
+	}
 
 	var seq int64
 	start := time.Now()
@@ -86,6 +112,15 @@ func (r *Runner) RunSize(ctx context.Context, size int64) (stats.Summary, []stri
 			for {
 				if runCtx.Err() != nil {
 					return
+				}
+
+				// Token-bucket pacing: block until a token is available or the
+				// run window ends. This is in-process and time-based, so its
+				// accuracy is unaffected by backend throttling on the bucket.
+				if limiter != nil {
+					if err := limiter.Wait(runCtx); err != nil {
+						return // context done
+					}
 				}
 
 				isRead := rng.Float64() < r.cfg.ReadRatio
@@ -112,7 +147,7 @@ func (r *Runner) RunSize(ctx context.Context, size int64) (stats.Summary, []stri
 	wg.Wait()
 	wall := time.Since(start)
 
-	return stats.Compute(collector.Snapshot(), wall), keys, nil
+	return collector.Snapshot(), keys, wall, nil
 }
 
 func (r *Runner) doUpload(ctx context.Context, c *stats.Collector, key string, body io.Reader, size int64) bool {

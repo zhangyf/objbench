@@ -58,3 +58,5 @@ github.com/tencentyun/qcloud-cos-sts-sdk v0.0.0-20250515025012-e0eec8a5d123/go.m
 github.com/zhangyf/objstore v0.15.1 h1:YtDKV9XsawtPYVPmebeN+mnafkwPhgCerKxwB2rqK5Y=
 github.com/zhangyf/objstore v0.15.1/go.mod h1:He+nPF+CA9R4XUzFZTVfeeV2oXBFgZN7y232ce2V+5I=
 golang.org/x/sync v0.0.0-20190423024810-112230192c58/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
+golang.org/x/time v0.11.0 h1:/bpjEDfN9tkoN/ryeYHnv5hcMlc8ncjMcM4XBk5NWV0=
+golang.org/x/time v0.11.0/go.mod h1:CDIdPxbZBQxdj6cxyCIdrNogrJKMJ7pr37NYpMcMDSg=

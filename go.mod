@@ -2,7 +2,10 @@ module github.com/zhangyf/objbench
 
 go 1.24.11
 
-require github.com/zhangyf/objstore v0.15.1
+require (
+	github.com/zhangyf/objstore v0.15.1
+	golang.org/x/time v0.11.0
+)
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.41.6 // indirect

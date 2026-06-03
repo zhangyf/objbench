@@ -38,6 +38,15 @@ type Config struct {
 	// WarmupObjects is the number of objects pre-uploaded per size so that
 	// read operations have something to fetch. If 0, defaults to Concurrency.
 	WarmupObjects int
+
+	// Rate is the target operations-per-second ceiling for THIS process
+	// (token-bucket limiter). 0 means unlimited (saturation benchmark).
+	// In distributed mode this is the per-agent quota.
+	Rate float64
+
+	// Burst is the token-bucket burst size. Defaults to 1 for a smooth,
+	// evenly-paced request stream (recommended for clean latency data).
+	Burst int
 }
 
 // ParsedSize converts a human size string ("4k", "1m", "10mib", "512", "1g")
@@ -116,6 +125,12 @@ func (c *Config) Validate() error {
 	}
 	if c.ReadRatio < 0 || c.ReadRatio > 1 {
 		return errors.New("read-ratio must be in [0,1]")
+	}
+	if c.Rate < 0 {
+		return errors.New("rate must be non-negative (0 = unlimited)")
+	}
+	if c.Burst < 0 {
+		return errors.New("burst must be non-negative")
 	}
 	return nil
 }
