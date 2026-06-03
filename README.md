@@ -63,6 +63,33 @@ objbench \
 > S3 凭证为空时自动走 AWS default credential chain（env / 共享凭据文件 / IMDS / STS）。
 > 可用 `-profile` 指定 AWS profile，`-endpoint` 指定 S3 兼容存储的自定义 endpoint。
 
+### 从环境变量读取凭证（不在命令行暴露 ak/sk）
+
+命令行参数为空时，自动按以下顺序回退到环境变量（命令行优先级最高）：
+
+| 配置项     | 通用变量              | COS 回退         | S3 回退                   |
+|------------|-----------------------|------------------|---------------------------|
+| secret-id  | `OBJBENCH_SECRET_ID`  | `COS_SECRET_ID`  | `AWS_ACCESS_KEY_ID`       |
+| secret-key | `OBJBENCH_SECRET_KEY` | `COS_SECRET_KEY` | `AWS_SECRET_ACCESS_KEY`   |
+| bucket     | `OBJBENCH_BUCKET`     | —                | —                         |
+| region     | `OBJBENCH_REGION`     | —                | —                         |
+
+```bash
+# COS：凭证全部从环境变量读取，命令行不出现 ak/sk
+export COS_SECRET_ID=...
+export COS_SECRET_KEY=...
+objbench -provider cos -bucket my-bucket-1250000000 -region ap-beijing \
+  -sizes 4k,1m,8m -duration 30s -concurrency 32 -read-ratio 0.7
+
+# S3：留空 secret-id/secret-key 即走 AWS default credential chain
+export AWS_ACCESS_KEY_ID=...
+export AWS_SECRET_ACCESS_KEY=...
+objbench -provider s3 -bucket test-bkt-tk -region ap-northeast-1 \
+  -sizes 1m,8m -duration 1m -concurrency 64
+```
+
+> 推荐用环境变量，避免凭证出现在 shell history / 进程列表（`ps`）中。
+
 ## 参数
 
 | 参数            | 默认值          | 说明                                       |
@@ -70,8 +97,8 @@ objbench \
 | `-provider`     | `cos`           | 存储后端：`cos` 或 `s3`                    |
 | `-bucket`       | （必填）        | 桶名                                       |
 | `-region`       | `""`            | 区域，如 `ap-beijing` / `ap-northeast-1`   |
-| `-secret-id`    | `""`            | COS SecretId / S3 Access Key ID            |
-| `-secret-key`   | `""`            | COS SecretKey / S3 Secret Access Key       |
+| `-secret-id`    | `""`            | COS SecretId / S3 Access Key ID（空则读环境变量） |
+| `-secret-key`   | `""`            | COS SecretKey / S3 Secret Access Key（空则读环境变量） |
 | `-endpoint`     | `""`            | 自定义 endpoint（S3 兼容模式）             |
 | `-profile`      | `""`            | AWS profile（仅 S3，密钥为空时生效）       |
 | `-sizes`        | `4k,64k,1m,8m`  | 逗号分隔的对象大小列表，支持 `k/m/g` 单位   |
