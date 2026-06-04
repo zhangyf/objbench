@@ -104,7 +104,7 @@ objbench -provider s3 -bucket test-bkt-tk -region ap-northeast-1 \
 | `-endpoint`     | `""`            | 自定义 endpoint（S3 兼容模式）             |
 | `-profile`      | `""`            | AWS profile（仅 S3，密钥为空时生效）       |
 | `-sizes`        | `4k,64k,1m,8m`  | 逗号分隔的对象大小列表，支持 `k/m/g` 单位   |
-| `-duration`     | `30s`           | 每个大小分组的测试时长                     |
+| `-duration`     | `30s`           | 每个大小分组的测试时长（带单位，如 `30s`/`5m`/`1h30m`） |
 | `-concurrency`  | `16`            | 并发 worker 数                             |
 | `-read-ratio`   | `0.5`           | 读操作占比 `[0,1]`，其余为写               |
 | `-prefix`       | `""`            | 所有压测对象的 key 前缀                    |
@@ -112,6 +112,8 @@ objbench -provider s3 -bucket test-bkt-tk -region ap-northeast-1 \
 | `-warmup`       | `0`             | 每个大小预上传的对象数（0 = 并发数）       |
 | `-rate`         | `0`             | 目标 QPS 上限（令牌桶）；`0` = 不限速（饱和压测） |
 | `-burst`        | `1`             | 令牌桶突发大小；越小节奏越平滑             |
+
+> ⏱️ **时间类参数单位**：`-duration` / `-poll` / `-wait-timeout` / `-start-delay` / `-collect-timeout` 均为 Go duration 格式，**必须带单位**（`ns/us/ms/s/m/h`），如 `30s`、`5m`、`1h30m`；只写裸数字 `30` 会报错 `missing unit in duration`。
 
 ## 可控并发与限速（令牌桶）
 

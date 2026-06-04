@@ -85,8 +85,8 @@ func runAgent(args []string) error {
 	var (
 		agentID  = fs.String("agent-id", "", "unique agent id (default: hostname-pid)")
 		runID    = fs.String("run-id", "", "run id to join (default: whatever the plan says)")
-		pollIntv = fs.Duration("poll", 2*time.Second, "plan polling interval")
-		waitFor  = fs.Duration("wait-timeout", 10*time.Minute, "max time to wait for a plan")
+		pollIntv = fs.Duration("poll", 2*time.Second, "plan polling interval; Go duration with unit, e.g. 500ms, 2s, 1m")
+		waitFor  = fs.Duration("wait-timeout", 10*time.Minute, "max time to wait for a plan; Go duration with unit, e.g. 30s, 10m, 1h")
 	)
 	_ = fs.Parse(args)
 

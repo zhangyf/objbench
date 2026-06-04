@@ -84,7 +84,7 @@ func runSingle(args []string) error {
 	sf := registerStoreFlags(fs)
 	var (
 		sizesStr    = fs.String("sizes", "4k,64k,1m,8m", "comma-separated object sizes, e.g. 4k,1m,16m")
-		duration    = fs.Duration("duration", 30*time.Second, "test duration per size group")
+		duration    = fs.Duration("duration", 30*time.Second, "test duration per size group; Go duration with unit, e.g. 30s, 5m, 1h30m")
 		concurrency = fs.Int("concurrency", 16, "number of parallel workers")
 		readRatio   = fs.Float64("read-ratio", 0.5, "fraction of reads in [0,1]; rest are writes")
 		keyPrefix   = fs.String("prefix", "", "key prefix for all benchmark objects")
